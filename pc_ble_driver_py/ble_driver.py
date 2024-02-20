@@ -1417,6 +1417,26 @@ class BLEGattsHVXParams(object):
         return hvx_params
 
 
+class BLEGattsValue(object):
+    def __init__(self, value, offset=0):
+        self.offset = offset
+        self.value = value
+
+    def to_c(self):
+        value = driver.ble_gatts_value_t()
+
+        if self.value:
+            self.data_array = util.list_to_uint8_array(self.value)
+            value.p_value = self.data_array.cast()
+            value.len = len(self.value)
+        else:
+            value.len = 0
+        return value
+
+    def from_c(self, value_c):
+        assert isinstance(value_c, driver.ble_gatts_value_t), "XXX"
+        return util.uint8_array_to_list(value_c.p_value, value_c.len)
+
 class BLEGattsCharHandles(object):
     def __init__(self, value_handle=0, user_desc_handle=0,
                  cccd_handle=0, sccd_handle=0):
@@ -2550,6 +2570,14 @@ class BLEDriver(object):
     def ble_gatts_sys_attr_set(self, conn_handle, sys_attr_data, length, flags):
         return driver.sd_ble_gatts_sys_attr_set(self.rpc_adapter, conn_handle,
                                                 sys_attr_data, length, flags)
+
+    @NordicSemiErrorCheck
+    @wrapt.synchronized(api_lock)
+    def ble_gatts_value_set(self, conn_handle, handle, value):
+        assert isinstance(value, BLEGattsValue), "Invalid argument type"
+        assert conn_handle > 0, "Invalid connection handle"
+        value = value.to_c()
+        return driver.sd_ble_gatts_value_set(self.rpc_adapter, conn_handle, handle, value)
 
     # IMPORTANT: Python annotations on callbacks make the reference count
     # IMPORTANT: for the object become zero in the binding. This makes the
